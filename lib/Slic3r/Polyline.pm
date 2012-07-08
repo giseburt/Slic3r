@@ -5,7 +5,7 @@ use warnings;
 use Math::Clipper qw();
 use Scalar::Util qw(reftype);
 use Slic3r::Geometry qw(A B polyline_remove_parallel_continuous_edges polyline_remove_acute_vertices
-    move_points same_point);
+    polyline_lines move_points same_point);
 
 # the constructor accepts an array(ref) of points
 sub new {
@@ -51,15 +51,7 @@ sub id {
 
 sub lines {
     my $self = shift;
-    my @lines = ();
-    my $previous_point;
-    foreach my $point (@$self) {
-        if ($previous_point) {
-            push @lines, Slic3r::Line->new($previous_point, $point);
-        }
-        $previous_point = $point;
-    }
-    return @lines;
+    return polyline_lines($self);
 }
 
 sub boost_linestring {
@@ -69,15 +61,12 @@ sub boost_linestring {
 
 sub merge_continuous_lines {
     my $self = shift;
-    
     polyline_remove_parallel_continuous_edges($self);
-    bless $_, 'Slic3r::Point' for @$self;
 }
 
 sub remove_acute_vertices {
     my $self = shift;
     polyline_remove_acute_vertices($self);
-    bless $_, 'Slic3r::Point' for @$self;
 }
 
 sub simplify {
@@ -106,6 +95,12 @@ sub nearest_point_to {
     
     $point = Slic3r::Geometry::nearest_point($point, $self);
     return Slic3r::Point->new($point);
+}
+
+sub nearest_point_index_to {
+    my $self = shift;
+    my ($point) = @_;
+    return Slic3r::Geometry::nearest_point_index($point, $self);
 }
 
 sub has_segment {

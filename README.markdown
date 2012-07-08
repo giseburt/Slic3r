@@ -130,6 +130,9 @@ The author is Alessandro Ranellucci.
         --small-perimeter-speed
                             Speed of print moves for small perimeters in mm/s or % over perimeter speed
                             (default: 30)
+        --external-perimeter-speed
+                            Speed of print moves for the external perimeter in mm/s or % over perimeter speed
+                            (default: 100%)
         --infill-speed      Speed of print moves in mm/s (default: 60)
         --solid-infill-speed Speed of print moves for solid surfaces in mm/s or % over infill speed
                             (default: 60)
@@ -234,7 +237,16 @@ The author is Alessandro Ranellucci.
                             Set a different extrusion width for perimeters
         --infill-extrusion-width
                             Set a different extrusion width for infill
+        --support-material-extrusion-width
+                            Set a different extrusion width for support material
         --bridge-flow-ratio Multiplier for extrusion when bridging (> 0, default: 1)
+  
+       Multiple extruder options:
+        --perimeters-extruder
+                            Extruder to use for perimeters (1+, default: 1)
+        --infill-extruder   Extruder to use for infill (1+, default: 1)
+        --support-material-extruder
+                            Extruder to use for support material (1+, default: 1)
             
 
 

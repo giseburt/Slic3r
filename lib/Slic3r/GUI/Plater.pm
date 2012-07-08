@@ -220,7 +220,7 @@ sub load_file {
     my $self = shift;
     my ($input_file) = @_;
     
-    $Slic3r::GUI::SkeinPanel::last_input_file = $input_file;
+    $Slic3r::GUI::SkeinPanel::last_skein_dir = dirname($input_file);
     
     my $process_dialog = Wx::ProgressDialog->new('Loading...', "Processing input file...", 100, $self, 0);
     $process_dialog->Pulse;
@@ -370,7 +370,8 @@ sub changescale {
     
     my $obj_idx = $self->selected_object_idx;
     my $scale = $self->{scale}[$obj_idx];
-    $scale = Wx::GetNumberFromUser("", "Enter the scale % for the selected object:", "Scale", $scale*100, 0, 1000, $self);
+    # max scale factor should be above 2540 to allow importing files exported in inches
+    $scale = Wx::GetNumberFromUser("", "Enter the scale % for the selected object:", "Scale", $scale*100, 0, 5000, $self);
     return if !$scale || $scale == -1;
     
     $self->statusbar->SetStatusText("Scaling object...");

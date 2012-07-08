@@ -37,6 +37,7 @@ use Slic3r::Flow;
 use Slic3r::Format::AMF;
 use Slic3r::Format::OBJ;
 use Slic3r::Format::STL;
+use Slic3r::GCode;
 use Slic3r::Geometry qw(PI);
 use Slic3r::Layer;
 use Slic3r::Line;
@@ -59,7 +60,6 @@ our $output_filename_format = '[input_filename_base].gcode';
 our $post_process       = [];
 
 # printer options
-our $nozzle_diameter    = 0.5;
 our $print_center       = [100,100];  # object will be centered around this point
 our $z_offset           = 0;
 our $gcode_flavor       = 'reprap';
@@ -70,17 +70,27 @@ our $g0                 = 0;
 our $gcode_comments     = 0;
 
 # filament options
-our $filament_diameter  = 3;    # mm
-our $extrusion_multiplier = 1;
-our $temperature        = 200;
-our $first_layer_temperature;
 our $bed_temperature    = 0;
 our $first_layer_bed_temperature;
+
+# extruders
+our $extruders              = [];
+our $nozzle_diameter        = [0.5];
+our $filament_diameter      = [3];    # mm
+our $extrusion_multiplier   = [1];
+our $temperature            = [200];
+our $first_layer_temperature= [];
+
+# extruder mapping (1-based indexes)
+our $perimeter_extruder         = 1;
+our $infill_extruder            = 1;
+our $support_material_extruder  = 1;
 
 # speed options
 our $travel_speed           = 130;      # mm/s
 our $perimeter_speed        = 30;       # mm/s
 our $small_perimeter_speed  = 30;       # mm/s or %
+our $external_perimeter_speed  = '100%';       # mm/s or %
 our $infill_speed           = 60;       # mm/s
 our $solid_infill_speed     = 60;       # mm/s or %
 our $top_solid_infill_speed = 50;       # mm/s or %
@@ -104,14 +114,16 @@ our $infill_every_layers    = 1;
 # flow options
 our $extrusion_width                = 0;
 our $first_layer_extrusion_width    = 0;
-our $perimeters_extrusion_width     = 0;
+our $perimeter_extrusion_width      = 0;
 our $infill_extrusion_width         = 0;
+our $support_material_extrusion_width = 0;
 our $bridge_flow_ratio              = 1;
 our $overlap_factor                 = 0.5;
-our $flow                           = Slic3r::Flow->new;
-our $first_layer_flow               = undef;
-our $perimeters_flow                = Slic3r::Flow->new;
-our $infill_flow                    = Slic3r::Flow->new;
+our $flow;
+our $first_layer_flow;
+our $perimeters_flow;
+our $infill_flow;
+our $support_material_flow;
 
 # print options
 our $perimeters         = 3;
@@ -127,7 +139,6 @@ our $support_material_threshold = 45;
 our $support_material_pattern = 'rectilinear';
 our $support_material_spacing = 2.5;
 our $support_material_angle = 0;
-our $support_material_tool = 0;
 our $start_gcode = "G28 ; home all axes";
 our $end_gcode = <<"END";
 M104 S0 ; turn off temperature

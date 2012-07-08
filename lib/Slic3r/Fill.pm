@@ -99,7 +99,7 @@ sub make_fill {
     
     # add spacing between adjacent surfaces
     {
-        my $distance = scale $layer->flow->spacing / 2;
+        my $distance = scale $layer->infill_flow->spacing / 2;
         my @offsets = ();
         foreach my $surface (@surfaces) {
             my $expolygon = $surface->expolygon;
@@ -128,16 +128,12 @@ sub make_fill {
         @surfaces = @new_surfaces;
     }
     
-    # organize infill surfaces using a shortest path search
-    @surfaces = @{shortest_path([
-        map [ $_->contour->[0], $_ ], @surfaces,
-    ])};
-    
     my @fills = ();
+    my @fills_ordering_points =  ();
     SURFACE: foreach my $surface (@surfaces) {
         my $filler          = $Slic3r::fill_pattern;
         my $density         = $Slic3r::fill_density;
-        my $flow_spacing    = $layer->flow->spacing;
+        my $flow_spacing    = $layer->infill_flow->spacing;
         my $is_bridge       = $layer->id > 0 && $surface->surface_type == S_TYPE_BOTTOM;
         my $is_solid        = (grep { $surface->surface_type == $_ } S_TYPE_TOP, S_TYPE_BOTTOM, S_TYPE_INTERNALSOLID) ? 1 : 0;
         
@@ -147,7 +143,7 @@ sub make_fill {
             $filler = $Slic3r::solid_fill_pattern;
             if ($is_bridge) {
                 $filler = 'rectilinear';
-                $flow_spacing = sqrt($Slic3r::bridge_flow_ratio * ($Slic3r::nozzle_diameter**2));
+                $flow_spacing = sqrt($Slic3r::bridge_flow_ratio * ($layer->infill_flow->nozzle_diameter**2));
             } elsif ($surface->surface_type == S_TYPE_INTERNALSOLID) {
                 $filler = 'rectilinear';
             }
@@ -163,6 +159,7 @@ sub make_fill {
         my $params = shift @paths;
         
         # save into layer
+        next unless @paths;
         push @fills, Slic3r::ExtrusionPath::Collection->new(
             paths => [
                 map Slic3r::ExtrusionPath->new(
@@ -173,22 +170,31 @@ sub make_fill {
                             ? ($surface->surface_type == S_TYPE_TOP ? EXTR_ROLE_TOPSOLIDFILL : EXTR_ROLE_SOLIDFILL)
                             : EXTR_ROLE_FILL),
                     depth_layers => $surface->depth_layers,
-                    flow_spacing => $params->{flow_spacing},
+                    flow_spacing => $params->{flow_spacing} || $flow_spacing,
                 ), @paths,
             ],
-        ) if @paths;
+        );
+        push @fills_ordering_points, $paths[0][0];
     }
     
     # add thin fill regions
-    push @fills, Slic3r::ExtrusionPath::Collection->new(
-        paths => [
-            map {
-                $_->isa('Slic3r::Polygon')
-                    ? Slic3r::ExtrusionLoop->new(polygon => $_, role => EXTR_ROLE_SOLIDFILL)->split_at_first_point
-                    : Slic3r::ExtrusionPath->new(polyline => $_, role => EXTR_ROLE_SOLIDFILL)
-            } @{$layer->thin_fills},
-        ],
-    ) if @{$layer->thin_fills};
+    {
+        my %args = (
+            role            => EXTR_ROLE_SOLIDFILL,
+            flow_spacing    => $layer->perimeters_flow->spacing,
+        );
+        push @fills, map {
+            $_->isa('Slic3r::Polygon')
+                ? Slic3r::ExtrusionLoop->new(polygon  => $_, %args)->split_at_first_point
+                : Slic3r::ExtrusionPath->new(polyline => $_, %args),
+        } @{$layer->thin_fills};
+    }
+    push @fills_ordering_points, map $_->[0], @{$layer->thin_fills};
+    
+    # organize infill paths using a shortest path search
+    @fills = @{shortest_path([
+        map [ $fills_ordering_points[$_], $fills[$_] ], 0..$#fills,
+    ])};
     
     return @fills;
 }

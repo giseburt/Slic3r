@@ -21,18 +21,19 @@ sub new {
     my ($parent) = @_;
     my $self = $class->SUPER::new($parent, -1);
     
+    no warnings 'qw';
     my %panels = (
         printer => {
             title => 'Printer',
-            options => [qw(nozzle_diameter bed_size print_center z_offset gcode_flavor use_relative_e_distances)],
+            options => [qw(nozzle_diameter#0 bed_size print_center z_offset gcode_flavor use_relative_e_distances)],
         },
         filament => {
             title => 'Filament',
-            options => [qw(filament_diameter extrusion_multiplier temperature first_layer_temperature bed_temperature first_layer_bed_temperature)],
+            options => [qw(filament_diameter#0 extrusion_multiplier#0 temperature#0 first_layer_temperature#0 bed_temperature first_layer_bed_temperature)],
         },
         print_speed => {
             title => 'Print speed',
-            options => [qw(perimeter_speed small_perimeter_speed infill_speed solid_infill_speed top_solid_infill_speed bridge_speed)],
+            options => [qw(perimeter_speed small_perimeter_speed external_perimeter_speed infill_speed solid_infill_speed top_solid_infill_speed bridge_speed)],
         },
         speed => {
             title => 'Other speed settings',
@@ -70,7 +71,7 @@ sub new {
         },
         extrusion => {
             title => 'Extrusion',
-            options => [qw(extrusion_width first_layer_extrusion_width perimeters_extrusion_width infill_extrusion_width bridge_flow_ratio)],
+            options => [qw(extrusion_width first_layer_extrusion_width perimeter_extrusion_width infill_extrusion_width support_material_extrusion_width bridge_flow_ratio)],
         },
         output => {
             title => 'Output',
@@ -86,7 +87,7 @@ sub new {
         },
         support_material => {
             title => 'Support material',
-            options => [qw(support_material support_material_threshold support_material_pattern support_material_spacing support_material_angle support_material_tool)],
+            options => [qw(support_material support_material_threshold support_material_pattern support_material_spacing support_material_angle support_material_extruder)],
         },
     );
     $self->{panels} = \%panels;
@@ -116,7 +117,7 @@ sub new {
         $make_tab->([qw(cooling notes)]),
         $make_tab->([qw(printer filament)], [qw(print_speed speed)]),
         $make_tab->([qw(gcode)]),
-        $make_tab->([qw(extrusion sequential_printing)], [qw(output other)]),
+        $make_tab->([qw(extrusion)], [qw(output other sequential_printing)]),
     );
     
     $tabpanel->AddPage(Slic3r::GUI::Plater->new($tabpanel), "Plater");

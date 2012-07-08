@@ -175,6 +175,9 @@ $j
     --small-perimeter-speed
                         Speed of print moves for small perimeters in mm/s or % over perimeter speed
                         (default: $Slic3r::small_perimeter_speed)
+    --external-perimeter-speed
+                        Speed of print moves for the external perimeter in mm/s or % over perimeter speed
+                        (default: $Slic3r::external_perimeter_speed)
     --infill-speed      Speed of print moves in mm/s (default: $Slic3r::infill_speed)
     --solid-infill-speed Speed of print moves for solid surfaces in mm/s or % over infill speed
                         (default: $Slic3r::solid_infill_speed)
@@ -279,7 +282,16 @@ $j
                         Set a different extrusion width for perimeters
     --infill-extrusion-width
                         Set a different extrusion width for infill
+    --support-material-extrusion-width
+                        Set a different extrusion width for support material
     --bridge-flow-ratio Multiplier for extrusion when bridging (> 0, default: $Slic3r::bridge_flow_ratio)
+  
+   Multiple extruder options:
+    --perimeters-extruder
+                        Extruder to use for perimeters (1+, default: 1)
+    --infill-extruder   Extruder to use for infill (1+, default: 1)
+    --support-material-extruder
+                        Extruder to use for support material (1+, default: 1)
     
 EOF
     exit ($exit_code || 0);

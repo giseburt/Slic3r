@@ -5,8 +5,10 @@ use Moo;
 has 'polygon' => (
     is          => 'rw',
     required    => 1,
-    handles     => [qw(is_printable nearest_point_to reverse)],
+    handles     => [qw(is_printable nearest_point_index_to reverse)],
 );
+
+has 'flow_spacing' => (is => 'rw');
 
 # see EXTR_ROLE_* constants in ExtrusionPath.pm
 has 'role'         => (is => 'rw', required => 1);
@@ -20,6 +22,28 @@ sub BUILD {
 sub deserialize {
     my $self = shift;
     $self->polygon($self->polygon->deserialize);
+}
+
+sub shortest_path {
+    my $self = shift;
+    return $self;
+}
+
+sub split_at_index {
+    my $self = shift;
+    my ($index) = @_;
+
+    $self->deserialize;
+
+    my @new_points = ();
+    push @new_points, @{$self->polygon}[$index .. $#{$self->polygon}];
+    push @new_points, @{$self->polygon}[0 .. $index];
+    
+    return Slic3r::ExtrusionPath->new(
+        polyline    => Slic3r::Polyline->new(\@new_points),
+        role        => $self->role,
+        flow_spacing => $self->flow_spacing,
+    );
 }
 
 sub split_at {
@@ -40,20 +64,12 @@ sub split_at {
     }
     die "Point not found" if $i == -1;
     
-    my @new_points = ();
-    push @new_points, @{$self->polygon}[$i .. $#{$self->polygon}];
-    push @new_points, @{$self->polygon}[0 .. $i];
-    
-    return Slic3r::ExtrusionPath->new(
-        polyline    => Slic3r::Polyline->new(\@new_points),
-        role        => $self->role,
-    );
+    return $self->split_at_index($i);
 }
 
 sub split_at_first_point {
     my $self = shift;
-    $self->deserialize;
-    return $self->split_at($self->polygon->[0]);
+    return $self->split_at_index(0);
 }
 
 # although a loop doesn't have endpoints, this method is provided to allow

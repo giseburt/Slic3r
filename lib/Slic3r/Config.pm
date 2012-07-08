@@ -6,7 +6,7 @@ use utf8;
 use constant PI => 4 * atan2(1, 1);
 
 # cemetery of old config settings
-our @Ignore = qw(duplicate_x duplicate_y multiply_x multiply_y);
+our @Ignore = qw(duplicate_x duplicate_y multiply_x multiply_y support_material_tool);
 
 our $Options = {
 
@@ -35,12 +35,6 @@ our $Options = {
     },
 
     # printer options
-    'nozzle_diameter' => {
-        label   => 'Nozzle diameter (mm)',
-        cli     => 'nozzle-diameter=f',
-        type    => 'f',
-        important => 1,
-    },
     'print_center' => {
         label   => 'Print center (mm)',
         cli     => 'print-center=s',
@@ -86,34 +80,70 @@ our $Options = {
         type    => 'bool',
     },
     
-    # filament options
-    'filament_diameter' => {
-        label   => 'Diameter (mm)',
-        cli     => 'filament-diameter=f',
+    # extruders options
+    'nozzle_diameter' => {
+        label   => 'Nozzle diameter (mm)',
+        cli     => 'nozzle-diameter=f@',
         type    => 'f',
         important => 1,
+        serialize   => sub { join ',', @{$_[0]} },
+        deserialize => sub { [ split /,/, $_[0] ] },
+    },
+    'filament_diameter' => {
+        label   => 'Diameter (mm)',
+        cli     => 'filament-diameter=f@',
+        type    => 'f',
+        important => 1,
+        serialize   => sub { join ',', @{$_[0]} },
+        deserialize => sub { [ split /,/, $_[0] ] },
     },
     'extrusion_multiplier' => {
         label   => 'Extrusion multiplier',
-        cli     => 'extrusion-multiplier=f',
+        cli     => 'extrusion-multiplier=f@',
         type    => 'f',
         aliases => [qw(filament_packing_density)],
+        serialize   => sub { join ',', @{$_[0]} },
+        deserialize => sub { [ split /,/, $_[0] ] },
+    },
+    'temperature' => {
+        label   => 'Temperature (°C)',
+        cli     => 'temperature=i@',
+        type    => 'i',
+        important => 1,
+        serialize   => sub { join ',', @{$_[0]} },
+        deserialize => sub { [ split /,/, $_[0] ] },
     },
     'first_layer_temperature' => {
         label   => 'First layer temperature (°C)',
-        cli     => 'first-layer-temperature=i',
+        cli     => 'first-layer-temperature=i@',
+        type    => 'i',
+        serialize   => sub { join ',', @{$_[0]} },
+        deserialize => sub { [ split /,/, $_[0] ] },
+    },
+    
+    # extruder mapping
+    'perimeter_extruder' => {
+        label   => 'Perimeter extruder',
+        cli     => 'perimeter-extruder=i',
+        type    => 'i',
+        aliases => [qw(perimeters_extruder)],
+    },
+    'infill_extruder' => {
+        label   => 'Infill extruder',
+        cli     => 'infill-extruder=i',
         type    => 'i',
     },
+    'support_material_extruder' => {
+        label   => 'Extruder',
+        cli     => 'support-material-extruder=i',
+        type    => 'i',
+    },
+    
+    # filament options
     'first_layer_bed_temperature' => {
         label   => 'First layer bed temperature (°C)',
         cli     => 'first-layer-bed-temperature=i',
         type    => 'i',
-    },
-    'temperature' => {
-        label   => 'Temperature (°C)',
-        cli     => 'temperature=i',
-        type    => 'i',
-        important => 1,
     },
     'bed_temperature' => {
         label   => 'Bed Temperature (°C)',
@@ -137,6 +167,12 @@ our $Options = {
     'small_perimeter_speed' => {
         label   => 'Small perimeters (mm/s or %)',
         cli     => 'small-perimeter-speed=s',
+        type    => 'f',
+        ratio_over => 'perimeter_speed',
+    },
+    'external_perimeter_speed' => {
+        label   => 'External perimeters (mm/s or %)',
+        cli     => 'external-perimeter-speed=s',
         type    => 'f',
         ratio_over => 'perimeter_speed',
     },
@@ -217,14 +253,20 @@ our $Options = {
         cli     => 'first-layer-extrusion-width=s',
         type    => 'f',
     },
-    'perimeters_extrusion_width' => {
-        label   => 'Perimeters extrusion width (mm or % or 0 for default)',
-        cli     => 'perimeters-extrusion-width=s',
+    'perimeter_extrusion_width' => {
+        label   => 'Perimeter extrusion width (mm or % or 0 for default)',
+        cli     => 'perimeter-extrusion-width=s',
         type    => 'f',
+        aliases => [qw(perimeters_extrusion_width)],
     },
     'infill_extrusion_width' => {
         label   => 'Infill extrusion width (mm or % or 0 for default)',
         cli     => 'infill-extrusion-width=s',
+        type    => 'f',
+    },
+    'support_material_extrusion_width' => {
+        label   => 'Support material extrusion width (mm or % or 0 for default)',
+        cli     => 'support-material-extrusion-width=s',
         type    => 'f',
     },
     'bridge_flow_ratio' => {
@@ -305,13 +347,6 @@ our $Options = {
         label   => 'Pattern angle (°)',
         cli     => 'support-material-angle=i',
         type    => 'i',
-    },
-    'support_material_tool' => {
-        label   => 'Extruder',
-        cli     => 'support-material-tool=i',
-        type    => 'select',
-        values  => [0,1],
-        labels  => [qw(Primary Secondary)],
     },
     'start_gcode' => {
         label   => 'Start G-code',
@@ -559,6 +594,7 @@ sub save {
     
     open my $fh, '>', $file;
     binmode $fh, ':utf8';
+    printf $fh "# generated by Slic3r $Slic3r::VERSION\n";
     foreach my $opt (sort keys %$Options) {
         next if $Options->{$opt}{gui_only};
         my $value = get_raw($opt);
@@ -655,24 +691,40 @@ sub validate {
     
     # --filament-diameter
     die "Invalid value for --filament-diameter\n"
-        if $Slic3r::filament_diameter < 1;
+        if grep $_ < 1, @$Slic3r::filament_diameter;
     
     # --nozzle-diameter
     die "Invalid value for --nozzle-diameter\n"
-        if $Slic3r::nozzle_diameter < 0;
+        if grep $_ < 0, @$Slic3r::nozzle_diameter;
     die "--layer-height can't be greater than --nozzle-diameter\n"
-        if $Slic3r::layer_height > $Slic3r::nozzle_diameter;
+        if grep $Slic3r::layer_height > $_, @$Slic3r::nozzle_diameter;
     die "First layer height can't be greater than --nozzle-diameter\n"
-        if $Slic3r::_first_layer_height > $Slic3r::nozzle_diameter;
+        if grep $Slic3r::_first_layer_height > $_, @$Slic3r::nozzle_diameter;
+    
+    # initialize extruder(s)
+    $Slic3r::extruders = [];
+    for my $t (0, map $_-1, $Slic3r::perimeter_extruder, $Slic3r::infill_extruder, $Slic3r::support_material_extruder) {
+        $Slic3r::extruders->[$t] ||= Slic3r::Extruder->new(
+            map { $_ => Slic3r::Config->get($_)->[$t] // Slic3r::Config->get($_)->[0] } #/
+                qw(nozzle_diameter filament_diameter extrusion_multiplier temperature first_layer_temperature)
+        );
+    }
     
     # calculate flow
-    $Slic3r::flow->calculate($Slic3r::extrusion_width);
+    $Slic3r::flow = $Slic3r::extruders->[0]->make_flow(width => $Slic3r::extrusion_width);
     if ($Slic3r::first_layer_extrusion_width) {
-        $Slic3r::first_layer_flow = Slic3r::Flow->new(layer_height => $Slic3r::_first_layer_height);
-        $Slic3r::first_layer_flow->calculate($Slic3r::first_layer_extrusion_width);
+        $Slic3r::first_layer_flow = $Slic3r::extruders->[0]->make_flow(
+            layer_height => $Slic3r::_first_layer_height,
+            width        => $Slic3r::first_layer_extrusion_width,
+        );
     }
-    $Slic3r::perimeters_flow->calculate($Slic3r::perimeters_extrusion_width || $Slic3r::extrusion_width);
-    $Slic3r::infill_flow->calculate($Slic3r::infill_extrusion_width || $Slic3r::extrusion_width);
+    $Slic3r::perimeters_flow = $Slic3r::extruders->[ $Slic3r::perimeter_extruder-1 ]
+        ->make_flow(width => $Slic3r::perimeter_extrusion_width || $Slic3r::extrusion_width);
+    $Slic3r::infill_flow = $Slic3r::extruders->[ $Slic3r::infill_extruder-1 ]
+        ->make_flow(width => $Slic3r::infill_extrusion_width || $Slic3r::extrusion_width);
+    $Slic3r::support_material_flow = $Slic3r::extruders->[ $Slic3r::support_material_extruder-1 ]
+        ->make_flow(width => $Slic3r::support_material_extrusion_width || $Slic3r::extrusion_width);
+    
     Slic3r::debugf "Default flow width = %s, spacing = %s, min_spacing = %s\n",
         $Slic3r::flow->width, $Slic3r::flow->spacing, $Slic3r::flow->min_spacing;
     
@@ -706,8 +758,9 @@ sub validate {
     # --infill-every-layers
     die "Invalid value for --infill-every-layers\n"
         if $Slic3r::infill_every_layers !~ /^\d+$/ || $Slic3r::infill_every_layers < 1;
+    # TODO: this check should be limited to the extruder used for infill
     die "Maximum infill thickness can't exceed nozzle diameter\n"
-        if $Slic3r::infill_every_layers * $Slic3r::layer_height > $Slic3r::nozzle_diameter;
+        if grep $Slic3r::infill_every_layers * $Slic3r::layer_height > $_, @$Slic3r::nozzle_diameter;
     
     # --scale
     die "Invalid value for --scale\n"
@@ -750,7 +803,8 @@ sub validate {
     die "Invalid value for --extruder-clearance-height\n"
         if $Slic3r::extruder_clearance_height <= 0;
     
-    $Slic3r::first_layer_temperature //= $Slic3r::temperature;          #/
+    $_->first_layer_temperature($_->temperature) for grep !defined $_->first_layer_temperature, @$Slic3r::extruders;
+    $Slic3r::first_layer_temperature->[$_] = $Slic3r::extruders->[$_]->first_layer_temperature for 0 .. $#$Slic3r::extruders;  # this is needed to provide a value to the legacy GUI and for config file re-serialization
     $Slic3r::first_layer_bed_temperature //= $Slic3r::bed_temperature;  #/
     
     # G-code flavors

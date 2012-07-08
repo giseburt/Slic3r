@@ -137,8 +137,9 @@ sub make_surfaces {
     my ($loops) = @_;
     
     {
+        my $safety_offset = scale 0.1;
         # merge everything
-        my $expolygons = union_ex(safety_offset($loops, scale 0.1));
+        my $expolygons = [ map $_->offset_ex(-$safety_offset), @{union_ex(safety_offset($loops, $safety_offset))} ];
         
         Slic3r::debugf "  %d surface(s) having %d holes detected from %d polylines\n",
             scalar(@$expolygons), scalar(map $_->holes, @$expolygons), scalar(@$loops);
@@ -291,6 +292,7 @@ sub make_perimeters {
     foreach my $island (@perimeters) {
         # do holes starting from innermost one
         my @holes = ();
+        my %is_external = ();
         my @hole_depths = map [ map $_->holes, @$_ ], @$island;
         
         # organize the outermost hole loops using a shortest path search
@@ -303,6 +305,7 @@ sub make_perimeters {
             
             # take first available hole
             push @holes, shift @{$hole_depths[0]};
+            $is_external{$#holes} = 1;
             
             my $current_depth = 0;
             while (1) {
@@ -333,9 +336,12 @@ sub make_perimeters {
         }
         
         # do holes, then contours starting from innermost one
-        $self->add_perimeter($_) for reverse @holes;
+        $self->add_perimeter($holes[$_], $is_external{$_} ? EXTR_ROLE_EXTERNAL_PERIMETER : undef)
+            for reverse 0 .. $#holes;
         for my $depth (reverse 0 .. $#$island) {
-            my $role = $depth == $#$island ? EXTR_ROLE_CONTOUR_INTERNAL_PERIMETER : EXTR_ROLE_PERIMETER;
+            my $role = $depth == $#$island ? EXTR_ROLE_CONTOUR_INTERNAL_PERIMETER
+                : $depth == 0 ? EXTR_ROLE_EXTERNAL_PERIMETER
+                : EXTR_ROLE_PERIMETER;
             $self->add_perimeter($_, $role) for map $_->contour, @{$island->[$depth]};
         }
     }
@@ -349,6 +355,7 @@ sub make_perimeters {
             } else {
                 push @thin_paths, Slic3r::ExtrusionPath->new(polyline => $_, role => EXTR_ROLE_PERIMETER);
             }
+            $thin_paths[-1]->flow_spacing($self->perimeters_flow->spacing);
         }
         my $collection = Slic3r::ExtrusionPath::Collection->new(paths => \@thin_paths);
         push @{ $self->perimeters }, $collection->shortest_path;
@@ -361,8 +368,9 @@ sub add_perimeter {
     
     return unless $polygon->is_printable($self->perimeters_flow->width);
     push @{ $self->perimeters }, Slic3r::ExtrusionLoop->new(
-        polygon => $polygon,
-        role => (abs($polygon->length) <= $Slic3r::small_perimeter_length) ? EXTR_ROLE_SMALLPERIMETER : ($role // EXTR_ROLE_PERIMETER),  #/
+        polygon         => $polygon,
+        role            => (abs($polygon->length) <= $Slic3r::small_perimeter_length) ? EXTR_ROLE_SMALLPERIMETER : ($role // EXTR_ROLE_PERIMETER),  #/
+        flow_spacing    => $self->perimeters_flow->spacing,
     );
 }
 

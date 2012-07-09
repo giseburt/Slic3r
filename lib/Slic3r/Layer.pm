@@ -152,13 +152,15 @@ sub make_surfaces {
     # the contours must be offsetted by half extrusion width inwards
     {
         my $distance = scale $self->perimeters_flow->width / 2;
+        my $layer_height = scale $self->perimeters_flow->layer_height;
+        my $dimensional_accuracy_inset = ((($layer_height*PI)/4)-$layer_height)/2;
         my @surfaces = @{$self->slices};
         @{$self->slices} = ();
         foreach my $surface (@surfaces) {
             push @{$self->slices}, map Slic3r::Surface->new
                 (expolygon => $_, surface_type => S_TYPE_INTERNAL),
                 map $_->offset_ex(+$distance),
-                $surface->expolygon->offset_ex(-2*$distance);
+                $surface->expolygon->offset_ex($dimensional_accuracy_inset-2*$distance);
         }
         
         # now detect thin walls by re-outgrowing offsetted surfaces and subtracting

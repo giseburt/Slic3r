@@ -516,35 +516,32 @@ sub write_gcode {
     print $fh $gcodegen->set_fan(0, 1) if $Slic3r::cooling && $Slic3r::disable_fan_first_layers;
     
     # write start commands to file
-    printf $fh $gcodegen->set_bed_temperature($Slic3r::first_layer_bed_temperature, 1),
-            if $Slic3r::first_layer_bed_temperature && $Slic3r::start_gcode !~ /M190/i;
-    for my $t (grep $Slic3r::extruders->[$_], 0 .. $#$Slic3r::first_layer_temperature) {
-        printf $fh $gcodegen->set_temperature($Slic3r::extruders->[$t]->first_layer_temperature, 0, $t)
-            if $Slic3r::extruders->[$t]->first_layer_temperature;
-    }
-	
-=BEGIN
     if ($Slic3r::first_layer_bed_temperature) {
-      if ($Slic3r::gcode_flavor ne 'makerbot' && $Slic3r::start_gcode =~ /(M190|M140)/i) {
-        $Slic3r::start_gcode =~ s/(M190|M140)(.*?)([SP])([0-9]+)/$1$2$3${Slic3r::first_layer_bed_temperature}/ig;
-      } elsif ($Slic3r::gcode_flavor eq 'makerbot' && $Slic3r::start_gcode =~ /(M109)/i) {
-        #MakerBot uses M109 as the HBP set temp code -- for now
-        $Slic3r::start_gcode =~ s/(M109)(.*?)(S[0-9]+)/$1$2S${Slic3r::first_layer_bed_temperature}/ig;
-      } else {
-        printf $fh $extruder->set_bed_temperature($Slic3r::first_layer_bed_temperature, 1),
-      }
+        if ($Slic3r::gcode_flavor ne 'makerbot' && $Slic3r::start_gcode =~ /(M190|M140)/i) {
+            $Slic3r::start_gcode =~ s/(M190|M140)(.*?)([SP])([0-9]+)/$1$2$3${Slic3r::first_layer_bed_temperature}/igm;
+        } elsif ($Slic3r::gcode_flavor eq 'makerbot' && $Slic3r::start_gcode =~ /(M109)/i) {
+            #MakerBot uses M109 as the HBP set temp code -- for now. -RobG
+            $Slic3r::start_gcode =~ s/(M109)(.*?)(S[0-9]+)/$1$2S${Slic3r::first_layer_bed_temperature}/igm;
+        } else {
+            printf $fh $gcodegen->set_bed_temperature($Slic3r::first_layer_bed_temperature, 1);
+        }
+    }
+    
+    if ($Slic3r::first_layer_temperature && scalar @$Slic3r::first_layer_temperature) {
+        my $set_temp_lines = "";
+        for my $t (grep $Slic3r::extruders->[$_], 0 .. $#$Slic3r::first_layer_temperature) {
+            $set_temp_lines .= $gcodegen->set_temperature($Slic3r::extruders->[$t]->first_layer_temperature, 0, $t)
+                if $Slic3r::extruders->[$t]->first_layer_temperature;
+        }
+        if ($Slic3r::gcode_flavor ne 'makerbot' && $Slic3r::start_gcode =~ /(M109|M104)/i) {
+            $Slic3r::start_gcode =~ s/^(M109|M104)(.*?)([SP])([0-9]+)[^\n]*(\n|\E)/$set_temp_lines/igm;
+        } elsif ($Slic3r::gcode_flavor eq 'makerbot' && $Slic3r::start_gcode =~ /(M104)/i) {
+            $Slic3r::start_gcode =~ s/^(M104)(.*?)(S[0-9]+)[^\n]*(\n|\E)/$set_temp_lines/igm;
+        } else {
+            printf $fh $set_temp_lines;
+        }
     }
 
-    if ($Slic3r::first_layer_temperature) {
-      if ($Slic3r::gcode_flavor ne 'makerbot' && $Slic3r::start_gcode =~ /(M109|M104)/i) {
-        $Slic3r::start_gcode =~ s/(M109|M104)(.*?)([SP])([0-9]+)/$1$2$3${Slic3r::first_layer_temperature}/ig;
-      } elsif ($Slic3r::gcode_flavor eq 'makerbot' && $Slic3r::start_gcode =~ /(M104)/i) {
-        $Slic3r::start_gcode =~ s/(M104)(.*?)(S[0-9]+)/$1$2S${Slic3r::first_layer_temperature}/ig;
-      } else {
-        printf $fh $extruder->set_bed_temperature($Slic3r::first_layer_temperature, 1),
-      }
-    }
-=END
     printf $fh "%s\n", Slic3r::Config->replace_options($Slic3r::start_gcode);
     for my $t (grep $Slic3r::extruders->[$_], 0 .. $#$Slic3r::first_layer_temperature) {
         printf $fh $gcodegen->set_temperature($Slic3r::extruders->[$t]->first_layer_temperature, 1, $t)

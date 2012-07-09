@@ -420,7 +420,7 @@ sub set_temperature {
         : ('M104', 'set temperature');
     return sprintf "$code %s%d %s; $comment\n",
         ($Slic3r::gcode_flavor eq 'mach3' ? 'P' : 'S'), $temperature,
-        (defined $tool && $tool != $self->extruder_idx) ? "T$tool " : "";
+        (defined $tool) ? "T$tool " : "";
 }
 
 sub set_bed_temperature {

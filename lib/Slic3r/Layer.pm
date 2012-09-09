@@ -153,7 +153,7 @@ sub make_surfaces {
     {
         my $distance = scale $self->perimeters_flow->width / 2;
         my $layer_height = scale $self->perimeters_flow->layer_height;
-        my $dimensional_accuracy_inset = ((($layer_height*PI)/4)-$layer_height)/2;
+        my $dimensional_accuracy_inset = 0;#((($layer_height*PI)/4)-$layer_height)/2;
         my @surfaces = @{$self->slices};
         @{$self->slices} = ();
         foreach my $surface (@surfaces) {

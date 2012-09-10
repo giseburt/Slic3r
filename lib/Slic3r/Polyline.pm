@@ -29,24 +29,20 @@ sub clone {
 
 sub serialize {
     my $self = shift;
-    my $s = \ pack 'l*', map @$_, @$self;
-    bless $s, ref $self;
-    return $s;
+    return pack 'l*', map @$_, @$self;
 }
 
 sub deserialize {
-    my $self = shift;
-    return $self if reftype $self ne 'SCALAR';
-    my @v = unpack '(l2)*', $$self;
-    my $o = [ map [ $v[2*$_], $v[2*$_+1] ], 0 .. int($#v/2) ];
-    bless $_, 'Slic3r::Point' for @$o;
-    bless $o, ref $self;
-    return $o;
+    my $class = shift;
+    my ($s) = @_;
+    
+    my @v = unpack '(l2)*', $s;
+    return $class->new(map [ $v[2*$_], $v[2*$_+1] ], 0 .. int($#v/2));
 }
 
-sub id {
+sub is_serialized {
     my $self = shift;
-    return join ' - ', sort map $_->id, @$self;
+    return (reftype $self) eq 'SCALAR' ? 1 : 0;
 }
 
 sub lines {
@@ -87,6 +83,12 @@ sub length {
     my $length = 0;
     $length += $_->length for $self->lines;
     return $length;
+}
+
+# this only applies to polylines
+sub grow {
+    my $self = shift;
+    return Slic3r::Polygon->new(@$self, CORE::reverse @$self[1..-2])->offset(@_);
 }
 
 sub nearest_point_to {
@@ -142,6 +144,7 @@ sub rotate {
     my $self = shift;
     my ($angle, $center) = @_;
     @$self = Slic3r::Geometry::rotate_points($angle, $center, @$self);
+    bless $_, 'Slic3r::Point' for @$self;
     return $self;
 }
 
@@ -149,6 +152,7 @@ sub translate {
     my $self = shift;
     my ($x, $y) = @_;
     @$self = Slic3r::Geometry::move_points([$x, $y], @$self);
+    bless $_, 'Slic3r::Point' for @$self;
     return $self;
 }
 

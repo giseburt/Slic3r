@@ -117,7 +117,10 @@ sub read_file {
         }
     }
     
-    return Slic3r::TriangleMesh->new(vertices => $vertices, facets => $facets);
+    my $model = Slic3r::Model->new;
+    my $object = $model->add_object(vertices => $vertices);
+    my $volume = $object->add_volume(facets => $facets);
+    return $model;
 }
 
 sub _read_ascii {
@@ -161,13 +164,13 @@ sub _read_binary {
 
 sub write_file {
     my $self = shift;
-    my ($file, $mesh, $binary) = @_;
+    my ($file, $model, %params) = @_;
     
     open my $fh, '>', $file;
     
-    $binary
-        ? _write_binary($fh, $mesh)
-        : _write_ascii($fh, $mesh);
+    $params{binary}
+        ? _write_binary($fh, $model->mesh)
+        : _write_ascii($fh, $model->mesh);
     
     close $fh;
 }
@@ -183,7 +186,7 @@ sub _write_binary {
     foreach my $facet (@{$mesh->facets}) {
         print $fh pack '(f<3)4S',
             @{_facet_normal($mesh, $facet)},
-            (map @{$mesh->vertices->[$_]}, @$facet[1,2,3]),
+            (map @{$mesh->vertices->[$_]}, @$facet[-3..-1]),
             0;
     }
 }
@@ -195,7 +198,7 @@ sub _write_ascii {
     foreach my $facet (@{$mesh->facets}) {
         printf $fh "   facet normal %f %f %f\n", @{_facet_normal($mesh, $facet)};
         printf $fh "      outer loop\n";
-        printf $fh "         vertex %f %f %f\n", @{$mesh->vertices->[$_]} for @$facet[1,2,3];
+        printf $fh "         vertex %f %f %f\n", @{$mesh->vertices->[$_]} for @$facet[-3..-1];
         printf $fh "      endloop\n";
         printf $fh "   endfacet\n";
     }
@@ -204,7 +207,7 @@ sub _write_ascii {
 
 sub _facet_normal {
     my ($mesh, $facet) = @_;
-    return triangle_normal(map $mesh->vertices->[$_], @$facet[1,2,3]);
+    return triangle_normal(map $mesh->vertices->[$_], @$facet[-3..-1]);
 }
 
 1;

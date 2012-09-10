@@ -83,12 +83,15 @@ sub fill_surface {
         $self->cache->{$cache_id} = [@polygons];
     }
     
-    my @paths = map Slic3r::Polyline->new(@$_, $_->[0]), map @$_, @{intersection_ex(
+    # build polylines from polygons without re-appending the initial point:
+    # this cuts the last segment on purpose, so that the jump to the next 
+    # path is more straight
+    my @paths = map Slic3r::Polyline->new(@$_), map @$_, @{intersection_ex(
         $self->cache->{$cache_id},
         [ map @$_, $expolygon->offset_ex($overlap_distance) ],
     )};
     my $collection = Slic3r::ExtrusionPath::Collection->new(
-        paths => [ map Slic3r::ExtrusionPath->new(polyline => $_, role => -1), @paths ],
+        paths => [ map Slic3r::ExtrusionPath->pack(polyline => $_, role => -1), @paths ],
     );
     
     return {}, map $_->polyline, $collection->shortest_path;

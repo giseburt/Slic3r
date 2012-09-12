@@ -427,6 +427,8 @@ sub set_temperature {
     my $gcode = sprintf "$code %s%d %s; $comment\n",
         ($Slic3r::Config->gcode_flavor eq 'mach3' ? 'P' : 'S'), $temperature,
         (defined $tool && $tool != $self->extruder_idx) ? "T$tool " : "";
+        
+    $self->extruder_idx($tool) if $tool != $self->extruder_idx && $Slic3r::Config->gcode_flavor eq 'makerbot';
     
     $gcode .= "M116 ; wait for temperature to be reached\n"
         if $Slic3r::Config->gcode_flavor eq 'teacup' && $wait;
